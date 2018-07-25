@@ -1216,6 +1216,9 @@ func (k *kataAgent) installReqFunc(c *kataclient.AgentClient) {
 	k.reqHandlers["grpc.UpdateRoutesRequest"] = func(ctx context.Context, req interface{}, opts ...golangGrpc.CallOption) (interface{}, error) {
 		return k.client.UpdateRoutes(ctx, req.(*grpc.UpdateRoutesRequest), opts...)
 	}
+	k.reqHandlers["grpc.AddRoutesRequest"] = func(ctx context.Context, req interface{}, opts ...golangGrpc.CallOption) (interface{}, error) {
+		return k.client.AddRoutes(ctx, req.(*grpc.AddRoutesRequest), opts...)
+	}
 	k.reqHandlers["grpc.UpdateInterfaceRequest"] = func(ctx context.Context, req interface{}, opts ...golangGrpc.CallOption) (interface{}, error) {
 		return k.client.UpdateInterface(ctx, req.(*grpc.UpdateInterfaceRequest), opts...)
 	}
@@ -1324,8 +1327,13 @@ func (k *kataAgent) updateInterfaceAndRoutes(sandbox *Sandbox, endpoint Endpoint
 		return err
 	}
 
+	if asDefault {
+		k.Logger().Info("replace default route")
+		// TODO:
+	}
+
 	if routes != nil {
-		routesReq := &grpc.UpdateRoutesRequest{
+		routesReq := &grpc.AddRoutesRequest{
 			Routes: &grpc.Routes{
 				Routes: routes,
 			},
