@@ -701,6 +701,8 @@ func (q *qemu) hotplugDevice(devInfo interface{}, devType deviceType, op operati
 		// TODO: find a way to remove dependency of deviceDrivers lib @weizhang555
 		device := devInfo.(deviceDrivers.VFIODevice)
 		return nil, q.hotplugVFIODevice(device, op)
+	case netDev:
+		return nil, q.hotplugNetDevice(devInfo, op)
 	default:
 		return nil, fmt.Errorf("cannot hotplug device: unsupported device type '%v'", devType)
 	}
@@ -952,4 +954,43 @@ func genericMemoryTopology(memoryMb, hostMemoryMb uint64) govmmQemu.Memory {
 	}
 
 	return memory
+}
+
+func (q *qemu) hotplugNetDevice(devInfo interface{}, op operation) error {
+	switch v := devInfo.(type) {
+	case PhysicalEndpoint:
+		return fmt.Errorf("NOT support '%v' yet", v)
+	case VirtualEndpoint:
+		endpoint := devInfo.(VirtualEndpoint)
+		return q.hotplugVirtualEndpint(VirtualEndpoint(endpoint), op)
+	case VhostUserEndpoint:
+		return fmt.Errorf("NOT support '%v' yet", v)
+	default:
+		return fmt.Errorf("unsupport endpoint type '%v'", v)
+	}
+}
+
+func (q *qemu) hotplugVirtualEndpint(endpoint VirtualEndpoint, op operation) error {
+	defer func(qemu *qemu) {
+		if q.qmpMonitorCh.qmp != nil {
+			q.qmpMonitorCh.qmp.Shutdown()
+		}
+	}(q)
+
+	qmp, err := q.qmpSetup()
+	if err != nil {
+		return err
+	}
+
+	q.qmpMonitorCh.qmp = qmp
+	switch op {
+	case addDevice:
+		return nil
+	case removeDevice:
+		err = fmt.Errorf("NOT support yet")
+	default:
+		err = fmt.Errorf("Invalid operation")
+	}
+
+	return err
 }

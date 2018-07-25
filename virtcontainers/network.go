@@ -14,7 +14,9 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -155,8 +157,8 @@ type Endpoint interface {
 	Attach(hypervisor) error
 	Detach(netNsCreated bool, netNsPath string) error
 
-	HotAttach(hypervisor) error
-	HotDetach(netNsCreated bool, netNsPath string) error
+	HotAttach(h hypervisor, netNsPath string) error
+	HotDetach(h hypervisor, netNsCreated bool, netNsPath string) error
 }
 
 // VirtualEndpoint gathers a network pair and its properties.
@@ -249,14 +251,29 @@ func (endpoint *VirtualEndpoint) Detach(netNsCreated bool, netNsPath string) err
 
 // HotAttach for virtual endpoint bridges the network pair and adds the
 // tap interface of the network pair to the hypervisor.
-func (endpoint *VirtualEndpoint) HotAttach(h hypervisor) error {
+func (endpoint *VirtualEndpoint) HotAttach(h hypervisor, netNsPath string) error {
 	networkLogger().Info("HotAttaching virtual endpoint")
-	return nil
+
+	err := doNetNS(netNsPath, func(_ ns.NetNS) error {
+		// create macvtap and open FDs
+		if err := xconnectVMNetwork(&(endpoint.NetPair), true); err != nil {
+			networkLogger().WithError(err).Error("Error bridging virtual ep")
+			return err
+		}
+
+		if _, err := h.hotplugAddDevice(*endpoint, netDev); err != nil {
+			networkLogger().WithError(err).Error("Error hotattach virtual ep")
+			return err
+		}
+		return nil
+	})
+
+	return err
 }
 
 // HotDetach for the virtual endpoint tears down the tap and bridge
 // created for the veth interface.
-func (endpoint *VirtualEndpoint) HotDetach(netNsCreated bool, netNsPath string) error {
+func (endpoint *VirtualEndpoint) HotDetach(h hypervisor, netNsCreated bool, netNsPath string) error {
 	networkLogger().Info("HotDetaching virtual endpoint")
 	return nil
 }
@@ -313,13 +330,13 @@ func (endpoint *VhostUserEndpoint) Detach(netNsCreated bool, netNsPath string) e
 }
 
 // HotAttach for vhostuser endpoint
-func (endpoint *VhostUserEndpoint) HotAttach(h hypervisor) error {
+func (endpoint *VhostUserEndpoint) HotAttach(h hypervisor, netNsPath string) error {
 	networkLogger().Info("HotAttaching vhostuser based endpoint")
 	return nil
 }
 
 // HotDetach for vhostuser endpoint
-func (endpoint *VhostUserEndpoint) HotDetach(netNsCreated bool, netNsPath string) error {
+func (endpoint *VhostUserEndpoint) HotDetach(h hypervisor, netNsCreated bool, netNsPath string) error {
 	networkLogger().Info("HotDetaching vhostuser based endpoint")
 	return nil
 }
@@ -394,14 +411,14 @@ func (endpoint *PhysicalEndpoint) Detach(netNsCreated bool, netNsPath string) er
 
 // HotAttach for physical endpoint binds the physical network interface to
 // vfio-pci and adds device to the hypervisor with vfio-passthrough.
-func (endpoint *PhysicalEndpoint) HotAttach(h hypervisor) error {
+func (endpoint *PhysicalEndpoint) HotAttach(h hypervisor, netNsPath string) error {
 	networkLogger().Info("HotAttaching physical endpoint")
 	return nil
 }
 
 // HotDetach for physical endpoint unbinds the physical network interface from vfio-pci
 // and binds it back to the saved host driver.
-func (endpoint *PhysicalEndpoint) HotDetach(netNsCreated bool, netNsPath string) error {
+func (endpoint *PhysicalEndpoint) HotDetach(h hypervisor, netNsCreated bool, netNsPath string) error {
 	networkLogger().Info("HotDetaching physical endpoint")
 	return nil
 }
@@ -1325,6 +1342,89 @@ func createEndpointsFromScan(networkNSPath string, config NetworkConfig) ([]Endp
 	}
 
 	return endpoints, nil
+}
+
+func createEndpointFromName(networkNSPath string, config NetworkConfig, name string) (Endpoint, error) {
+	netnsHandle, err := netns.GetFromPath(networkNSPath)
+	if err != nil {
+		return nil, err
+	}
+	defer netnsHandle.Close()
+
+	netlinkHandle, err := netlink.NewHandleAt(netnsHandle)
+	if err != nil {
+		return nil, err
+	}
+	defer netlinkHandle.Delete()
+
+	linkList, err := netlinkHandle.LinkList()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, link := range linkList {
+		var endpoint Endpoint
+
+		netInfo, err := networkInfoFromLink(netlinkHandle, link)
+		if err != nil {
+			return nil, err
+		}
+
+		if netInfo.Iface.Name != name {
+			continue
+		}
+
+		if err := doNetNS(networkNSPath, func(_ ns.NetNS) error {
+
+			// TODO: This is the incoming interface
+			// based on the incoming interface we should create
+			// an appropriate EndPoint based on interface type
+			// This should be a switch
+
+			// Check if interface is a physical interface. Do not create
+			// tap interface/bridge if it is.
+			isPhysical, err := isPhysicalIface(netInfo.Iface.Name)
+			if err != nil {
+				return err
+			}
+
+			if isPhysical {
+				cnmLogger().WithField("interface", netInfo.Iface.Name).Info("Physical network interface found")
+				endpoint, err = createPhysicalEndpoint(netInfo)
+			} else {
+				var socketPath string
+
+				// Check if this is a dummy interface which has a vhost-user socket associated with it
+				socketPath, err = vhostUserSocketPath(netInfo)
+				if err != nil {
+					return err
+				}
+
+				if socketPath != "" {
+					cnmLogger().WithField("interface", netInfo.Iface.Name).Info("VhostUser network interface found")
+					endpoint, err = createVhostUserEndpoint(netInfo, socketPath)
+				} else {
+					cnmLogger().WithField("interface", netInfo.Iface.Name).Info("Virtual network interface found")
+					// TODO: idx maybe cause confusion with createEndpointsFromScan
+					re := regexp.MustCompile("[0-9]+")
+					idx, err := strconv.Atoi(re.FindString(netInfo.Iface.Name))
+					if err != nil {
+						return err
+					}
+					endpoint, err = createVirtualNetworkEndpoint(idx, netInfo.Iface.Name, config.InterworkingModel)
+				}
+			}
+
+			return err
+		}); err != nil {
+			return nil, err
+		}
+
+		endpoint.SetProperties(netInfo)
+		return endpoint, nil
+	}
+
+	return nil, fmt.Errorf("No such interface '%v'", name)
 }
 
 // isPhysicalIface checks if an interface is a physical device.

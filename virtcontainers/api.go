@@ -719,7 +719,7 @@ func ListNetwork(sandboxID string) ([]Endpoint, error) {
 }
 
 // AttachNetwork is the virtcontainers entry point to hot attach nic.
-func AttachNetwork(sandboxID string, network string) error {
+func AttachNetwork(sandboxID string, network string, asDefault bool) error {
 	if sandboxID == "" {
 		return errNeedSandboxID
 	}
@@ -735,7 +735,7 @@ func AttachNetwork(sandboxID string, network string) error {
 		return err
 	}
 
-	return s.AttachNetwork(network)
+	return s.AttachNetwork(network, asDefault)
 }
 
 // DetachNetwork is the virtcontainers entry point to hot detach nic.

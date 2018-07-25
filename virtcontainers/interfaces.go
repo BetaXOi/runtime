@@ -42,7 +42,7 @@ type VC interface {
 	ResumeContainer(sandboxID, containerID string) error
 
 	ListNetwork(sandboxID string) ([]Endpoint, error)
-	AttachNetwork(sandboxID, network string) error
+	AttachNetwork(sandboxID, network string, asDefault bool) error
 	DetachNetwork(sandboxID, network string) error
 }
 
@@ -75,7 +75,7 @@ type VCSandbox interface {
 	IOStream(containerID, processID string) (io.WriteCloser, io.Reader, io.Reader, error)
 
 	ListNetwork() ([]Endpoint, error)
-	AttachNetwork(network string) error
+	AttachNetwork(network string, asDefault bool) error
 	DetachNetwork(network string) error
 }
 

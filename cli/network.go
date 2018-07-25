@@ -101,7 +101,12 @@ var netAttachCommand = cli.Command{
 	Name:      "attach",
 	Usage:     "attach network",
 	ArgsUsage: `attach <container> <network>`,
-	Flags:     []cli.Flag{},
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "default, d",
+			Usage: "specify the network as the default route",
+		},
+	},
 	Action: func(context *cli.Context) error {
 		if context.Args().Present() == false {
 			return fmt.Errorf("missing container ID, should provide one")
@@ -119,7 +124,8 @@ var netAttachCommand = cli.Command{
 		}
 
 		network := context.Args().Get(1)
-		return vci.AttachNetwork(sandboxID, network)
+		asDefault := context.Bool("default")
+		return vci.AttachNetwork(sandboxID, network, asDefault)
 	},
 }
 

@@ -142,8 +142,8 @@ func (impl *VCImpl) ListNetwork(sandboxID string) ([]Endpoint, error) {
 }
 
 // AttachNetwork implements the VC function of the same name.
-func (impl *VCImpl) AttachNetwork(sandboxID, network string) error {
-	return AttachNetwork(sandboxID, network)
+func (impl *VCImpl) AttachNetwork(sandboxID, network string, asDefault bool) error {
+	return AttachNetwork(sandboxID, network, asDefault)
 }
 
 // DetachNetwork implements the VC function of the same name.

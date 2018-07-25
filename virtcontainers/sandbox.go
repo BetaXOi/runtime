@@ -1431,12 +1431,35 @@ func (s *Sandbox) AddVhostUserDevice(devInfo api.VhostUserDevice, devType config
 	return fmt.Errorf("unsupported device type")
 }
 
+// ListNetwork get endpoints from configuration of sandbox
 func (s *Sandbox) ListNetwork() ([]Endpoint, error) {
 	return listNetworkCommon(s.networkNS)
 }
 
-func (s *Sandbox) AttachNetwork(network string) error {
-	return nil
+// AttachNetwork hot attach a network interface into VM
+// the defult route of VM will be replaced if asDefault is true
+func (s *Sandbox) AttachNetwork(network string, asDefault bool) error {
+	endpoint, err := createEndpointFromName(s.networkNS.NetNsPath, s.config.NetworkConfig, network)
+	if err != nil {
+		return nil
+	}
+
+	err = endpoint.HotAttach(s.hypervisor, s.networkNS.NetNsPath)
+	if err != nil {
+		s.Logger().Infof("Hot attach network interface '%v' failed", network)
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			e := endpoint.HotDetach(s.hypervisor, s.networkNS.NetNsCreated, s.networkNS.NetNsPath)
+			if e != nil {
+				s.Logger().Infof("Hot detach network interface '%v' when rollback failed", network)
+			}
+		}
+	}()
+
+	return s.agent.updateInterfaceAndRoutes(s, endpoint, asDefault)
 }
 
 func (s *Sandbox) DetachNetwork(network string) error {

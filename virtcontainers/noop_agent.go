@@ -140,3 +140,8 @@ func (n *noopAgent) pauseContainer(sandbox *Sandbox, c Container) error {
 func (n *noopAgent) resumeContainer(sandbox *Sandbox, c Container) error {
 	return nil
 }
+
+//
+func (n *noopAgent) updateInterfaceAndRoutes(sandbox *Sandbox, endpoint Endpoint, asDefault bool) error {
+	return nil
+}

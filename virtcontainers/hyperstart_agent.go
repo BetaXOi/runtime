@@ -858,3 +858,8 @@ func (h *hyper) resumeContainer(sandbox *Sandbox, c Container) error {
 func (h *hyper) cleanupSandbox(sandbox *Sandbox) error {
 	return nil
 }
+
+//
+func (h *hyper) updateInterfaceAndRoutes(sandbox *Sandbox, endpoint Endpoint, asDefault bool) error {
+	return nil
+}
