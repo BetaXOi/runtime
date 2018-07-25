@@ -985,7 +985,7 @@ func (q *qemu) hotplugVirtualEndpint(endpoint VirtualEndpoint, op operation) err
 	q.qmpMonitorCh.qmp = qmp
 	switch op {
 	case addDevice:
-		return nil
+		return attachVirtuanEndpointByQMP(q, endpoint)
 	case removeDevice:
 		err = fmt.Errorf("NOT support yet")
 	default:
@@ -993,4 +993,51 @@ func (q *qemu) hotplugVirtualEndpint(endpoint VirtualEndpoint, op operation) err
 	}
 
 	return err
+}
+
+func attachVirtuanEndpointByQMP(q *qemu, endpoint VirtualEndpoint) error {
+	idx := 0
+	tapFds := ""
+	for _, VMFd := range endpoint.NetPair.VMFds {
+		fdName := fmt.Sprintf("tapfd%d", idx)
+		if tapFds == "" {
+			tapFds = fdName
+		} else {
+			tapFds = fmt.Sprintf("%s:%s", tapFds, fdName)
+		}
+
+		err := q.qmpMonitorCh.qmp.SendFileHandle(q.qmpMonitorCh.ctx, fdName, int(VMFd.Fd()))
+		if err != nil {
+			return err
+		}
+
+		idx++
+	}
+
+	idx = 0
+	vhostFds := ""
+	for _, VhostFd := range endpoint.NetPair.VhostFds {
+		fdName := fmt.Sprintf("vhostfd%d", idx)
+		if vhostFds == "" {
+			vhostFds = fdName
+		} else {
+			vhostFds = fmt.Sprintf("%s:%s", vhostFds, fdName)
+		}
+
+		err := q.qmpMonitorCh.qmp.SendFileHandle(q.qmpMonitorCh.ctx, fdName, int(VhostFd.Fd()))
+		if err != nil {
+			return err
+		}
+
+		idx++
+	}
+
+	mac := endpoint.NetPair.TAPIface.HardAddr
+	devID := strings.Replace(endpoint.NetPair.TAPIface.Name, "tap", "hostnet", 1)
+	netID := strings.Replace(endpoint.NetPair.TAPIface.Name, "tap", "net", 1)
+	addr, bridge, err := q.addDeviceToBridge(devID)
+	if err != nil {
+		return fmt.Errorf("Generate PCI address failed")
+	}
+	return q.qmpMonitorCh.qmp.NetworkHotPlugAdd(q.qmpMonitorCh.ctx, devID, netID, tapFds, vhostFds, mac, bridge.ID, addr)
 }

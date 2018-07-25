@@ -207,6 +207,6 @@ type agent interface {
 	// resumeContainer will resume a paused container
 	resumeContainer(sandbox *Sandbox, c Container) error
 
-	//
+	// updateInterfaceAndRoutes will tell the agent to update network interface IP and routes
 	updateInterfaceAndRoutes(sandbox *Sandbox, endpoint Endpoint, asDefault bool) error
 }

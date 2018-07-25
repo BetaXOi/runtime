@@ -257,12 +257,12 @@ func (endpoint *VirtualEndpoint) HotAttach(h hypervisor, netNsPath string) error
 	err := doNetNS(netNsPath, func(_ ns.NetNS) error {
 		// create macvtap and open FDs
 		if err := xconnectVMNetwork(&(endpoint.NetPair), true); err != nil {
-			networkLogger().WithError(err).Error("Error bridging virtual ep")
+			networkLogger().WithError(err).Error("Error bridging virtual endpint")
 			return err
 		}
 
 		if _, err := h.hotplugAddDevice(*endpoint, netDev); err != nil {
-			networkLogger().WithError(err).Error("Error hotattach virtual ep")
+			networkLogger().WithError(err).Error("Error hotattach virtual endpoint")
 			return err
 		}
 		return nil

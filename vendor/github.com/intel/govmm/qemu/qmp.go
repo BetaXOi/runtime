@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"context"
+	"syscall"
 )
 
 // QMPLog is a logging interface used by the qemu package to log various
@@ -118,6 +119,7 @@ type qmpCommand struct {
 	args           map[string]interface{}
 	filter         *qmpEventFilter
 	resultReceived bool
+	fd             int
 }
 
 // QMP is a structure that contains the internal state used by startQMPLoop and
@@ -292,6 +294,7 @@ func (q *QMP) writeNextQMPCommand(cmdQueue *list.List) {
 	if cmd.args != nil {
 		cmdData["arguments"] = cmd.args
 	}
+	fd := cmd.fd
 	encodedCmd, err := json.Marshal(&cmdData)
 	if err != nil {
 		cmd.res <- qmpResult{
@@ -300,14 +303,40 @@ func (q *QMP) writeNextQMPCommand(cmdQueue *list.List) {
 		}
 		cmdQueue.Remove(cmdEl)
 	}
-	q.cfg.Logger.Infof("%s", string(encodedCmd))
-	encodedCmd = append(encodedCmd, '\n')
-	_, err = q.conn.Write(encodedCmd)
-	if err != nil {
-		cmd.res <- qmpResult{
-			err: fmt.Errorf("Unable to write command to qmp socket %v", err),
+	if fd == -1 {
+		q.cfg.Logger.Infof("%s", string(encodedCmd))
+		encodedCmd = append(encodedCmd, '\n')
+		_, err = q.conn.Write(encodedCmd)
+		if err != nil {
+			cmd.res <- qmpResult{
+				err: fmt.Errorf("Unable to write command to qmp socket %v", err),
+			}
+			cmdQueue.Remove(cmdEl)
 		}
-		cmdQueue.Remove(cmdEl)
+	} else {
+		q.cfg.Logger.Infof("%s with fd %d", string(encodedCmd), fd)
+		uConn, ok := q.conn.(*net.UnixConn)
+		if !ok {
+			cmd.res <- qmpResult{
+				err: fmt.Errorf("Unable to casting net.Conn(%v) to net.UnixConn", q.conn),
+			}
+			cmdQueue.Remove(cmdEl)
+		}
+		socket, err := uConn.File()
+		if err != nil {
+			cmd.res <- qmpResult{
+				err: fmt.Errorf("Unable to get os.File from net.UnixConn %v", err),
+			}
+			cmdQueue.Remove(cmdEl)
+		}
+		rights := syscall.UnixRights(fd)
+		err = syscall.Sendmsg(int(socket.Fd()), encodedCmd, rights, nil, 0)
+		if err != nil {
+			cmd.res <- qmpResult{
+				err: fmt.Errorf("Unable to write command to qmp socket With fd %d %v", fd, err),
+			}
+			cmdQueue.Remove(cmdEl)
+		}
 	}
 }
 
@@ -484,8 +513,8 @@ func startQMPLoop(conn io.ReadWriteCloser, cfg QMPConfig,
 	return q
 }
 
-func (q *QMP) executeCommandWithResponse(ctx context.Context, name string, args map[string]interface{},
-	filter *qmpEventFilter) (interface{}, error) {
+func (q *QMP) executeCommandWithResponseWithFD(ctx context.Context, name string, args map[string]interface{},
+	filter *qmpEventFilter, fd int) (interface{}, error) {
 	var err error
 	var response interface{}
 	resCh := make(chan qmpResult)
@@ -498,6 +527,7 @@ func (q *QMP) executeCommandWithResponse(ctx context.Context, name string, args 
 		name:   name,
 		args:   args,
 		filter: filter,
+		fd:     fd,
 	}:
 	}
 
@@ -514,6 +544,11 @@ func (q *QMP) executeCommandWithResponse(ctx context.Context, name string, args 
 	}
 
 	return response, err
+}
+
+func (q *QMP) executeCommandWithResponse(ctx context.Context, name string, args map[string]interface{},
+	filter *qmpEventFilter) (interface{}, error) {
+	return q.executeCommandWithResponseWithFD(ctx, name, args, filter, -1)
 }
 
 func (q *QMP) executeCommand(ctx context.Context, name string, args map[string]interface{},
@@ -827,4 +862,53 @@ func (q *QMP) ExecuteQueryHotpluggableCPUs(ctx context.Context) ([]HotpluggableC
 	}
 
 	return cpus, nil
+}
+
+// SendFileHandle send fd to qemu use SCM
+func (q *QMP) SendFileHandle(ctx context.Context, fdName string, fd int) error {
+	args := map[string]interface{}{
+		"fdname": fdName,
+	}
+	_, err := q.executeCommandWithResponseWithFD(ctx, "getfd", args, nil, fd)
+
+	return err
+}
+
+// NetworkHotPlugAdd attach a network device
+func (q *QMP) NetworkHotPlugAdd(ctx context.Context, devID, netID, tapFds, vhostFds, mac, bus, addr string) error {
+	args0 := map[string]interface{}{
+		"type":     "tap",
+		"fds":      tapFds,
+		"id":       devID,
+		"vhost":    "on",
+		"vhostfds": vhostFds,
+	}
+	err := q.executeCommand(ctx, "netdev_add", args0, nil)
+	if err != nil {
+		q.cfg.Logger.Infof("NetworkHotPlugAdd netdev_add failed")
+		return err
+	}
+
+	args1 := map[string]interface{}{
+		"driver": "virtio-net-pci",
+		"netdev": devID,
+		"id":     netID,
+		"mac":    mac,
+		"bus":    bus,
+		"addr":   addr,
+	}
+
+	err = q.executeCommand(ctx, "device_add", args1, nil)
+	if err != nil {
+		q.cfg.Logger.Infof("NetworkHotPlugAdd netdev_add failed")
+	}
+
+	return err
+}
+
+// NetworkHotPlugDel detach a network device
+func (q *QMP) NetworkHotPlugDel(ctx context.Context, blockdevID string) error {
+	args := map[string]interface{}{}
+	args["id"] = blockdevID
+	return q.executeCommand(ctx, "netdev_del", args, nil)
 }
