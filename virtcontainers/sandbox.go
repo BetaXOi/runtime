@@ -1430,3 +1430,15 @@ func (s *Sandbox) AddVhostUserDevice(devInfo api.VhostUserDevice, devType config
 	}
 	return fmt.Errorf("unsupported device type")
 }
+
+func (s *Sandbox) ListNetwork() ([]NetworkInfo, error) {
+	return []NetworkInfo{}, nil
+}
+
+func (s *Sandbox) AttachNetwork(network string) error {
+	return nil
+}
+
+func (s *Sandbox) DetachNetwork(network string) error {
+	return nil
+}

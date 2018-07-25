@@ -135,3 +135,18 @@ func (impl *VCImpl) PauseContainer(sandboxID, containerID string) error {
 func (impl *VCImpl) ResumeContainer(sandboxID, containerID string) error {
 	return ResumeContainer(sandboxID, containerID)
 }
+
+// ListNetwork implements the VC function of the same name.
+func (impl *VCImpl) ListNetwork(sandboxID string) ([]NetworkInfo, error) {
+	return ListNetwork(sandboxID)
+}
+
+// AttachNetwork implements the VC function of the same name.
+func (impl *VCImpl) AttachNetwork(sandboxID, network string) error {
+	return AttachNetwork(sandboxID, network)
+}
+
+// DetachNetwork implements the VC function of the same name.
+func (impl *VCImpl) DetachNetwork(sandboxID, network string) error {
+	return DetachNetwork(sandboxID, network)
+}

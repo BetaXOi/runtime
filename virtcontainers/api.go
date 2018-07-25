@@ -696,3 +696,63 @@ func PauseContainer(sandboxID, containerID string) error {
 func ResumeContainer(sandboxID, containerID string) error {
 	return togglePauseContainer(sandboxID, containerID, false)
 }
+
+// ListNetwork is the virtcontainers entry point to list nics.
+func ListNetwork(sandboxID string) ([]NetworkInfo, error) {
+	if sandboxID == "" {
+		return []NetworkInfo{}, errNeedSandboxID
+	}
+
+	lockFile, err := rLockSandbox(sandboxID)
+	if err != nil {
+		return []NetworkInfo{}, err
+	}
+	defer unlockSandbox(lockFile)
+
+	s, err := fetchSandbox(sandboxID)
+	if err != nil {
+		return []NetworkInfo{}, err
+	}
+
+	return s.ListNetwork()
+}
+
+// AttachNetwork is the virtcontainers entry point to hot attach nic.
+func AttachNetwork(sandboxID string, network string) error {
+	if sandboxID == "" {
+		return errNeedSandboxID
+	}
+
+	lockFile, err := rwLockSandbox(sandboxID)
+	if err != nil {
+		return err
+	}
+	defer unlockSandbox(lockFile)
+
+	s, err := fetchSandbox(sandboxID)
+	if err != nil {
+		return err
+	}
+
+	return s.AttachNetwork(network)
+}
+
+// DetachNetwork is the virtcontainers entry point to hot detach nic.
+func DetachNetwork(sandboxID string, network string) error {
+	if sandboxID == "" {
+		return errNeedSandboxID
+	}
+
+	lockFile, err := rwLockSandbox(sandboxID)
+	if err != nil {
+		return err
+	}
+	defer unlockSandbox(lockFile)
+
+	s, err := fetchSandbox(sandboxID)
+	if err != nil {
+		return err
+	}
+
+	return s.DetachNetwork(network)
+}

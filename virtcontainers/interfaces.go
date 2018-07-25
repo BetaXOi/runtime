@@ -40,6 +40,10 @@ type VC interface {
 	UpdateContainer(sandboxID, containerID string, resources specs.LinuxResources) error
 	PauseContainer(sandboxID, containerID string) error
 	ResumeContainer(sandboxID, containerID string) error
+
+	ListNetwork(sandboxID string) ([]NetworkInfo, error)
+	AttachNetwork(sandboxID, network string) error
+	DetachNetwork(sandboxID, network string) error
 }
 
 // VCSandbox is the Sandbox interface
@@ -69,6 +73,10 @@ type VCSandbox interface {
 	SignalProcess(containerID, processID string, signal syscall.Signal, all bool) error
 	WinsizeProcess(containerID, processID string, height, width uint32) error
 	IOStream(containerID, processID string) (io.WriteCloser, io.Reader, io.Reader, error)
+
+	ListNetwork() ([]NetworkInfo, error)
+	AttachNetwork(network string) error
+	DetachNetwork(network string) error
 }
 
 // VCContainer is the Container interface

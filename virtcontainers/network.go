@@ -154,6 +154,9 @@ type Endpoint interface {
 	SetProperties(NetworkInfo)
 	Attach(hypervisor) error
 	Detach(netNsCreated bool, netNsPath string) error
+
+	HotAttach(hypervisor) error
+	HotDetach(netNsCreated bool, netNsPath string) error
 }
 
 // VirtualEndpoint gathers a network pair and its properties.
@@ -244,6 +247,20 @@ func (endpoint *VirtualEndpoint) Detach(netNsCreated bool, netNsPath string) err
 	})
 }
 
+// HotAttach for virtual endpoint bridges the network pair and adds the
+// tap interface of the network pair to the hypervisor.
+func (endpoint *VirtualEndpoint) HotAttach(h hypervisor) error {
+	networkLogger().Info("HotAttaching virtual endpoint")
+	return nil
+}
+
+// HotDetach for the virtual endpoint tears down the tap and bridge
+// created for the veth interface.
+func (endpoint *VirtualEndpoint) HotDetach(netNsCreated bool, netNsPath string) error {
+	networkLogger().Info("HotDetaching virtual endpoint")
+	return nil
+}
+
 // Properties returns the properties of the interface.
 func (endpoint *VhostUserEndpoint) Properties() NetworkInfo {
 	return endpoint.EndpointProperties
@@ -292,6 +309,18 @@ func (endpoint *VhostUserEndpoint) Attach(h hypervisor) error {
 // Detach for vhostuser endpoint
 func (endpoint *VhostUserEndpoint) Detach(netNsCreated bool, netNsPath string) error {
 	networkLogger().Info("Detaching vhostuser based endpoint")
+	return nil
+}
+
+// HotAttach for vhostuser endpoint
+func (endpoint *VhostUserEndpoint) HotAttach(h hypervisor) error {
+	networkLogger().Info("HotAttaching vhostuser based endpoint")
+	return nil
+}
+
+// HotDetach for vhostuser endpoint
+func (endpoint *VhostUserEndpoint) HotDetach(netNsCreated bool, netNsPath string) error {
+	networkLogger().Info("HotDetaching vhostuser based endpoint")
 	return nil
 }
 
@@ -361,6 +390,20 @@ func (endpoint *PhysicalEndpoint) Detach(netNsCreated bool, netNsPath string) er
 	// We do not need to enter the network namespace to bind back the
 	// physical interface to host driver.
 	return bindNICToHost(endpoint)
+}
+
+// HotAttach for physical endpoint binds the physical network interface to
+// vfio-pci and adds device to the hypervisor with vfio-passthrough.
+func (endpoint *PhysicalEndpoint) HotAttach(h hypervisor) error {
+	networkLogger().Info("HotAttaching physical endpoint")
+	return nil
+}
+
+// HotDetach for physical endpoint unbinds the physical network interface from vfio-pci
+// and binds it back to the saved host driver.
+func (endpoint *PhysicalEndpoint) HotDetach(netNsCreated bool, netNsPath string) error {
+	networkLogger().Info("HotDetaching physical endpoint")
+	return nil
 }
 
 // EndpointType identifies the type of the network endpoint.
