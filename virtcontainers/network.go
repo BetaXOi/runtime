@@ -675,6 +675,10 @@ func removeNetworkCommon(networkNS NetworkNamespace, netNsCreated bool) error {
 	return nil
 }
 
+func listNetworkCommon(networkNS NetworkNamespace) ([]Endpoint, error) {
+	return networkNS.Endpoints, nil
+}
+
 func createLink(netHandle *netlink.Handle, name string, expectedLink netlink.Link) (netlink.Link, []*os.File, error) {
 	var newLink netlink.Link
 	var fds []*os.File
@@ -1304,6 +1308,7 @@ func createEndpointsFromScan(networkNSPath string, config NetworkConfig) ([]Endp
 					cnmLogger().WithField("interface", netInfo.Iface.Name).Info("VhostUser network interface found")
 					endpoint, err = createVhostUserEndpoint(netInfo, socketPath)
 				} else {
+					cnmLogger().WithField("interface", netInfo.Iface.Name).Info("Virtual network interface found")
 					endpoint, err = createVirtualNetworkEndpoint(idx, netInfo.Iface.Name, config.InterworkingModel)
 				}
 			}

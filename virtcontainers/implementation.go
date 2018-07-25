@@ -137,7 +137,7 @@ func (impl *VCImpl) ResumeContainer(sandboxID, containerID string) error {
 }
 
 // ListNetwork implements the VC function of the same name.
-func (impl *VCImpl) ListNetwork(sandboxID string) ([]NetworkInfo, error) {
+func (impl *VCImpl) ListNetwork(sandboxID string) ([]Endpoint, error) {
 	return ListNetwork(sandboxID)
 }
 

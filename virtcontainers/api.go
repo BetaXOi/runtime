@@ -698,20 +698,21 @@ func ResumeContainer(sandboxID, containerID string) error {
 }
 
 // ListNetwork is the virtcontainers entry point to list nics.
-func ListNetwork(sandboxID string) ([]NetworkInfo, error) {
+func ListNetwork(sandboxID string) ([]Endpoint, error) {
 	if sandboxID == "" {
-		return []NetworkInfo{}, errNeedSandboxID
+		//return NetworkInfo{}, errNeedSandboxID
+		return nil, errNeedSandboxID
 	}
 
 	lockFile, err := rLockSandbox(sandboxID)
 	if err != nil {
-		return []NetworkInfo{}, err
+		return nil, err
 	}
 	defer unlockSandbox(lockFile)
 
 	s, err := fetchSandbox(sandboxID)
 	if err != nil {
-		return []NetworkInfo{}, err
+		return nil, err
 	}
 
 	return s.ListNetwork()
