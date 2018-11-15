@@ -225,6 +225,30 @@ func newLinuxDeviceInfo(d spec.LinuxDevice) (*config.DeviceInfo, error) {
 	return &deviceInfo, nil
 }
 
+func isSysAdmin(caps vc.LinuxCapabilities) bool {
+	for _, cap := range caps.Permitted {
+		if cap == "CAP_SYS_ADMIN" {
+			return true
+		}
+	}
+
+	return false
+}
+
+// isVFIO checks if the device provided is a vfio group.
+func isVFIO(hostPath string) bool {
+	// Ignore /dev/vfio/vfio character device
+	if strings.HasPrefix(hostPath, filepath.Join("/dev/vfio/", "vfio")) {
+		return false
+	}
+
+	if strings.HasPrefix(hostPath, "/dev/vfio/") && len(hostPath) > len("/dev/vfio/") {
+		return true
+	}
+
+	return false
+}
+
 func containerDeviceInfos(spec CompatOCISpec) ([]config.DeviceInfo, error) {
 	ociLinuxDevices := spec.Spec.Linux.Devices
 
@@ -232,8 +256,18 @@ func containerDeviceInfos(spec CompatOCISpec) ([]config.DeviceInfo, error) {
 		return []config.DeviceInfo{}, nil
 	}
 
+	isPrivileged := false
+	if spec.Process != nil {
+		isPrivileged = isSysAdmin(spec.Process.Capabilities.(vc.LinuxCapabilities))
+	}
+
 	var devices []config.DeviceInfo
 	for _, d := range ociLinuxDevices {
+		if isPrivileged && isVFIO(d.Path) {
+			ociLog.Infof("Skip VFIO device %s in privilege mode", d.Path)
+			continue
+		}
+
 		linuxDeviceInfo, err := newLinuxDeviceInfo(d)
 		if err != nil {
 			return []config.DeviceInfo{}, err
