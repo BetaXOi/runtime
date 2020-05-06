@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/kata-containers/runtime/virtcontainers/device/config"
 	"github.com/kata-containers/runtime/virtcontainers/store"
@@ -314,6 +315,8 @@ type HypervisorConfig struct {
 	// VMid is the id of the VM that create the hypervisor if the VM is created by the factory.
 	// VMid is "" if the hypervisor is not created by the factory.
 	VMid string
+
+	VSockConnectTimeout time.Duration
 }
 
 // vcpu mapping from vcpu number to thread number

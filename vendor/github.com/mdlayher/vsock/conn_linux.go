@@ -56,6 +56,22 @@ func dialStream(cid, port uint32) (net.Conn, error) {
 	return dialStreamLinuxHandleError(cfd, cid, port)
 }
 
+// dialStreamTimeout is the entry point for DialStreamTimeout on Linux.
+func dialStreamTimeout(cid, port uint32, timeout *unix.Timeval) (net.Conn, error) {
+	fd, err := unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	err = unix.SetsockoptTimeval(fd, unix.AF_VSOCK, unix.SO_VM_SOCKETS_CONNECT_TIMEOUT, timeout)
+	if err != nil {
+		return nil, err
+	}
+
+	cfd := &sysFD{fd: fd}
+	return dialStreamLinuxHandleError(cfd, cid, port)
+}
+
 // dialStreamLinuxHandleError ensures that any errors from dialStreamLinux result
 // in the socket being cleaned up properly.
 func dialStreamLinuxHandleError(cfd fd, cid, port uint32) (net.Conn, error) {

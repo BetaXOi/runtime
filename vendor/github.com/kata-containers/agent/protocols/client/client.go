@@ -34,6 +34,8 @@ const (
 var defaultDialTimeout = 15 * time.Second
 var defaultCloseTimeout = 5 * time.Second
 
+var vsockConnectTimeout time.Duration = 0
+
 // AgentClient is an agent gRPC client connection wrapper for agentgrpc.AgentServiceClient
 type AgentClient struct {
 	agentgrpc.AgentServiceClient
@@ -328,10 +330,19 @@ func vsockDialer(sock string, timeout time.Duration) (net.Conn, error) {
 	}
 
 	dialFunc := func() (net.Conn, error) {
+		if vsockConnectTimeout != 0 {
+			return vsock.DialTimeout(cid, port, vsockConnectTimeout)
+		}
 		return vsock.Dial(cid, port)
 	}
 
 	timeoutErr := grpcStatus.Errorf(codes.DeadlineExceeded, "timed out connecting to vsock %d:%d", cid, port)
 
 	return commonDialer(timeout, dialFunc, timeoutErr)
+}
+
+// UpdateVsockConntectTimeout uptime timeout of vsock connection.
+// No lock protection, no contention now
+func UpdateVsockConntectTimeout(timeout time.Duration) {
+	vsockConnectTimeout = timeout
 }

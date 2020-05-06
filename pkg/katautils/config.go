@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	goruntime "runtime"
 	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
 	vc "github.com/kata-containers/runtime/virtcontainers"
@@ -118,6 +119,8 @@ type hypervisor struct {
 	HotplugVFIOOnRootBus    bool   `toml:"hotplug_vfio_on_root_bus"`
 	DisableVhostNet         bool   `toml:"disable_vhost_net"`
 	GuestHookPath           string `toml:"guest_hook_path"`
+
+	VSockConnectTimeoutStr string `toml:"vsock_connect_timeout"`
 }
 
 type proxy struct {
@@ -599,6 +602,8 @@ func newQemuHypervisorConfig(h hypervisor) (vc.HypervisorConfig, error) {
 		HotplugVFIOOnRootBus:    h.HotplugVFIOOnRootBus,
 		DisableVhostNet:         h.DisableVhostNet,
 		GuestHookPath:           h.guestHookPath(),
+
+		VSockConnectTimeout: h.VSockConnectTimeout(),
 	}, nil
 }
 
@@ -697,6 +702,8 @@ func updateRuntimeConfigAgent(configPath string, tomlConf tomlConfig, config *oc
 			LongLiveConn: true,
 			UseVSock:     config.HypervisorConfig.UseVSock,
 			Debug:        agentConfig.Debug,
+
+			VSockConnectTimeout: config.HypervisorConfig.VSockConnectTimeout,
 		}
 
 		return nil
@@ -712,6 +719,8 @@ func updateRuntimeConfigAgent(configPath string, tomlConf tomlConfig, config *oc
 				Trace:     agent.trace(),
 				TraceMode: agent.traceMode(),
 				TraceType: agent.traceType(),
+
+				VSockConnectTimeout: config.HypervisorConfig.VSockConnectTimeout,
 			}
 		default:
 			return fmt.Errorf("%s agent type is not supported", k)
@@ -1163,4 +1172,13 @@ func SetConfigOptions(n, runtimeConfig, sysRuntimeConfig string) {
 	if sysRuntimeConfig != "" {
 		defaultSysConfRuntimeConfiguration = sysRuntimeConfig
 	}
+}
+
+func (h hypervisor) VSockConnectTimeout() time.Duration {
+	duration, err := time.ParseDuration(h.VSockConnectTimeoutStr)
+	if err != nil {
+		return 0
+	}
+
+	return duration
 }

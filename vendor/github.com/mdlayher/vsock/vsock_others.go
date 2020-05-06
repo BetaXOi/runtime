@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 	"runtime"
+
+	"golang.org/x/sys/unix"
 )
 
 var (
@@ -22,3 +24,6 @@ func listenStream(_ uint32) (net.Listener, error) {
 func dialStream(_, _ uint32) (net.Conn, error) {
 	return nil, errUnimplemented
 }
+
+func dialStreamTimeout(_, _ uint32, timeout *unix.Timeval) (net.Conn, error) {
+	return nil, errUnimplemented

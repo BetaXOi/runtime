@@ -5,6 +5,9 @@ package vsock
 import (
 	"fmt"
 	"net"
+	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -48,6 +51,23 @@ func Listen(port uint32) (net.Listener, error) {
 func Dial(contextID, port uint32) (net.Conn, error) {
 	return dialStream(contextID, port)
 }
+
+// DialTimeout dials a connection-oriented net.Conn to a VM sockets server with timeout.
+// The contextID and port parameters specify the address of the server.
+//
+// If dialing a connection from the hypervisor to a virtual machine, the VM's
+// context ID should be specified.
+//
+// If dialing from a VM to the hypervisor, ContextIDHypervisor should be used
+// to talk to the hypervisor process, or ContextIDHost should be used to talk
+// to other processes on the host machine.
+//
+// When the connection is no longer needed, Close must be called to free resources.
+func DialTimeout(contextID, port uint32, timeout time.Duration) (net.Conn, error) {
+	tv := unix.NsecToTimeval(timeout.Nanoseconds())
+	return dialStreamTimeout(contextID, port, &tv)
+}
+
 
 // TODO(mdlayher): ListenPacket and DialPacket (or maybe another parameter for Dial?).
 
