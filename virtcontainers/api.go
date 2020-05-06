@@ -71,11 +71,18 @@ func createSandboxFromConfig(ctx context.Context, sandboxConfig SandboxConfig, f
 
 	var err error
 
+	server, err := startEventServer(ctx, sandboxConfig)
+	if err != nil {
+		return nil, err
+	}
+	sandboxConfig.HypervisorConfig.HostVSockPort = server.Port
+
 	// Create the sandbox.
 	s, err := createSandbox(ctx, sandboxConfig, factory)
 	if err != nil {
 		return nil, err
 	}
+	s.waitAgentReady(server)
 
 	// cleanup sandbox resources in case of any failure
 	defer func() {

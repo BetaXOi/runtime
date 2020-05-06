@@ -105,6 +105,7 @@ const (
 	rngID                    = "rng0"
 	vsockKernelOption        = "agent.use_vsock"
 	fallbackFileBackedMemDir = "/dev/shm"
+	hostVsockPort            = "agent.host_vsock_port"
 )
 
 var qemuMajorVersion int
@@ -165,6 +166,11 @@ func (q *qemu) kernelParameters() string {
 	// This will be consumed by the agent to determine if it needs to listen on
 	// a serial or vsock channel
 	params = append(params, Param{vsockKernelOption, strconv.FormatBool(q.config.UseVSock)})
+
+	if q.config.UseVSock {
+		port := strconv.FormatUint(uint64(q.config.HostVSockPort), 10)
+		params = append(params, Param{hostVsockPort, port})
+	}
 
 	// add the params specified by the provided config. As the kernel
 	// honours the last parameter value set and since the config-provided

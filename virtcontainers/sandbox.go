@@ -13,6 +13,7 @@ import (
 	"os"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -22,6 +23,7 @@ import (
 	"github.com/vishvananda/netlink"
 
 	"github.com/kata-containers/agent/protocols/grpc"
+	"github.com/kata-containers/agent/protocols/event"
 	"github.com/kata-containers/runtime/virtcontainers/device/api"
 	"github.com/kata-containers/runtime/virtcontainers/device/config"
 	"github.com/kata-containers/runtime/virtcontainers/device/drivers"
@@ -193,6 +195,9 @@ type Sandbox struct {
 	disableVMShutdown bool
 
 	ctx context.Context
+
+	eventServer *event.EventServer
+	agentReady chan bool
 }
 
 // ID returns the sandbox identifier string.
@@ -446,6 +451,43 @@ func (s *Sandbox) getAndStoreGuestDetails() error {
 	return nil
 }
 
+func startEventServer(ctx context.Context, sandboxConfig SandboxConfig) (*event.EventServer, error) {
+	if sandboxConfig.HypervisorConfig.UseVSock {
+		server, err := event.StartEventServiceServer()
+		if err != nil {
+			virtLog.Info("StartEventServiceServer failed")
+			return nil, err
+		}
+
+		return server, nil
+	}
+
+	return nil, nil
+}
+
+func (s *Sandbox) waitAgentReady(server *event.EventServer) {
+	go func() {
+			if server == nil {
+			s.agentReady <- true
+			return
+		}
+
+		for {
+			select {
+			case event := <-server.Event:
+				if event == "Ready" {
+					s.agentReady <- true
+					return
+				}
+			case <- time.After(time.Second * 10):
+				s.Logger().Infof("write agent ready timeout")
+				s.agentReady <- true
+				return
+			}
+		}
+	}()
+}
+
 // createSandbox creates a sandbox from a sandbox description, the containers list, the hypervisor
 // and the agent passed through the Config structure.
 // It will create and store the sandbox structure, and then ask the hypervisor
@@ -545,6 +587,7 @@ func newSandbox(ctx context.Context, sandboxConfig SandboxConfig, factory Factor
 		stateful:        sandboxConfig.Stateful,
 		networkNS:       NetworkNamespace{NetNsPath: sandboxConfig.NetworkConfig.NetNSPath},
 		ctx:             ctx,
+		agentReady:      make(chan bool),
 	}
 
 	vcStore, err := store.NewVCSandboxStore(ctx, s.id)

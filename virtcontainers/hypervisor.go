@@ -295,6 +295,9 @@ type HypervisorConfig struct {
 	// UseVSock use a vsock for agent communication
 	UseVSock bool
 
+	// Host vsock port
+	HostVSockPort uint32
+
 	// HotplugVFIOOnRootBus is used to indicate if devices need to be hotplugged on the
 	// root bus instead of a bridge.
 	HotplugVFIOOnRootBus bool

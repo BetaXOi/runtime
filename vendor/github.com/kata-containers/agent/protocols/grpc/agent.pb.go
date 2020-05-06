@@ -6,6 +6,7 @@
 
 	It is generated from these files:
 		agent.proto
+		event.proto
 		health.proto
 		oci.proto
 

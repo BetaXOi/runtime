@@ -720,6 +720,19 @@ func (k *kataAgent) startSandbox(sandbox *Sandbox) error {
 		hostname = hostname[:maxHostnameLen]
 	}
 
+	// wait notify
+	if sandbox.config.HypervisorConfig.UseVSock {
+Loop:
+		for {
+			select {
+			case ready := <-sandbox.agentReady:
+				if ready {
+					break Loop
+				}
+			}
+		}
+	}
+
 	// check grpc server is serving
 	if err = k.check(); err != nil {
 		return err
